@@ -1,4 +1,3 @@
-// Coordina todo el proceso en consola
 import java.util.*;
 import java.io.*;
 
@@ -16,7 +15,7 @@ public class Main {
             List<Token> tokens = lexer.analizar(programa);
 
             // =====================================================
-            // 3. Generar archivo progfte.dep (código depurado)
+            // 3. Generar archivo progfte.dep
             // =====================================================
             List<String> depurado = new ArrayList<>();
             for (String linea : programa) {
@@ -27,12 +26,12 @@ public class Main {
             FileManager.escribirArchivoDep("progfte.dep", depurado);
 
             // =====================================================
-            // 4. Construir tabla de símbolos FORMAL
+            // 4. Tabla de símbolos
             // =====================================================
             List<EntradaSimbolo> tablaSimbolos = construirTablaSimbolos(tokens);
 
             // =====================================================
-            // 5. Generar archivo progfte.tab
+            // 5. Generar progfte.tab
             // =====================================================
             String contenidoTab = generarArchivoTab(tablaSimbolos);
             FileManager.escribirArchivo(
@@ -41,7 +40,7 @@ public class Main {
             );
 
             // =====================================================
-            // 6. Generar archivo progfte.tok (FORMATO PROFESIONAL)
+            // 6. Generar progfte.tok
             // =====================================================
             String contenidoTok = generarArchivoTok(tokens, lexer.getErrores());
             FileManager.escribirArchivo(
@@ -49,7 +48,22 @@ public class Main {
                 Arrays.asList(contenidoTok.split("\n"))
             );
 
-            System.out.println("Análisis léxico completado correctamente.");
+            System.out.println("✅ Análisis léxico completado");
+
+            // ==========================================
+            // ✅ ANALIZADOR SINTÁCTICO (AQUÍ VA)
+            // ==========================================
+            Parser parser = new Parser(tokens);
+
+            try {
+                Nodo arbol = parser.parse();
+                System.out.println("✅ Análisis sintáctico correcto");
+
+                imprimirArbol(arbol, 0);
+
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -57,7 +71,7 @@ public class Main {
     }
 
     // =========================================================
-    // CONSTRUCCIÓN DE LA TABLA DE SÍMBOLOS
+    // TABLA DE SÍMBOLOS
     // =========================================================
     private static List<EntradaSimbolo> construirTablaSimbolos(List<Token> tokens) {
 
@@ -103,8 +117,6 @@ public class Main {
     }
 
     // =========================================================
-    // GENERAR ARCHIVO progfte.tab
-    // =========================================================
     private static String generarArchivoTab(List<EntradaSimbolo> tabla) {
 
         StringBuilder sb = new StringBuilder();
@@ -131,94 +143,44 @@ public class Main {
     }
 
     // =========================================================
-    // GENERAR ARCHIVO progfte.tok (TABULAR + REFERENCIAS)
-    // =========================================================
     private static String generarArchivoTok(List<Token> tokens, List<String> errores) {
 
-    StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
 
-    String separador = "=".repeat(65) + "\n";
-    String divisor   = "-".repeat(65) + "\n";
-
-    sb.append(separador);
-    sb.append("  ANALIZADOR LÉXICO — LENGUAJE PF2025\n");
-    sb.append("  Archivo: progfte.tok\n");
-    sb.append(separador);
-
-    sb.append(String.format(
-        " %-5s | %-20s | %-20s | %-10s | %s%n",
-        "NUM", "TOKEN", "LEXEMA", "REFERENCIA", "LINEA"
-    ));
-    sb.append(divisor);
-
-    int contador = 1;
-    for (Token t : tokens) {
-        sb.append(String.format(
-            " %-5d | %-20s | %-20s | %-10d | %d%n",
-            contador++,
-            t.getTipo(),
-            t.getLexema(),
-            referenciaToken(t.getTipo()),
-            t.getLinea()
-        ));
-    }
-
-    // ===================== ERRORES =====================
-    sb.append("\n");
-    sb.append(separador);
-    sb.append("  ERRORES LÉXICOS\n");
-    sb.append(separador);
-
-    if (errores.isEmpty()) {
-        sb.append("  Sin errores léxicos detectados.\n");
-    } else {
-        for (String error : errores) {
-            sb.append("  ").append(error).append("\n");
+        for (Token t : tokens) {
+            sb.append(t.toString()).append("\n");
         }
-    }
 
-    sb.append(separador);
-    return sb.toString();
-}
-
-    // =========================================================
-    // REFERENCIAS NUMÉRICAS DE TOKENS
-    // =========================================================
-    private static int referenciaToken(TokenType tipo) {
-        switch (tipo) {
-            case PROG:     return 100;
-            case DECL:     return 101;
-            case TIPO:     return 102;
-            case INICIO:   return 103;
-            case END:      return 104;
-            case ID:       return 300;
-            case CENT:     return 400;
-            case ASIG:     return 90;
-            case MAS:      return 10;
-            case MENOS:    return 11;
-            case MUL:      return 12;
-            case DIV:      return 13;
-            case PAREN:    return 75;
-            case TESIS:    return 76;
-            case COMA:     return 91;
-            case PC:       return 92;
-            case IMPDIG:   return 110;
-            case IMPCAD:   return 111;
-            case LEERDIG:  return 112;
-            case EOF:      return 999;
-            default:       return -1;
+        if (!errores.isEmpty()) {
+            sb.append("\nERRORES:\n");
+            for (String error : errores) {
+                sb.append(error).append("\n");
+            }
         }
+
+        return sb.toString();
     }
 
-    // =========================================================
-    // VALOR INICIAL POR TIPO
     // =========================================================
     private static String valorInicialPorTipo(String tipo) {
         switch (tipo) {
-            case "int":       return "0";
-            case "cad":       return "\"\"";
-            case "booleano":  return "false";
-            default:          return "indefinido";
+            case "int": return "0";
+            case "cad": return "\"\"";
+            case "booleano": return "false";
+            default: return "indefinido";
+        }
+    }
+
+    // =========================================================
+    public static void imprimirArbol(Nodo nodo, int nivel) {
+        for (int i = 0; i < nivel; i++) {
+            System.out.print("  ");
+        }
+
+        System.out.println(nodo.getValor());
+
+        for (Nodo hijo : nodo.getHijos()) {
+            imprimirArbol(hijo, nivel + 1);
         }
     }
 }
