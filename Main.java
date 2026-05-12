@@ -48,16 +48,16 @@ public class Main {
                 Arrays.asList(contenidoTok.split("\n"))
             );
 
-            System.out.println("✅ Análisis léxico completado");
+            System.out.println("Análisis léxico completado");
 
             // ==========================================
-            // ✅ ANALIZADOR SINTÁCTICO (AQUÍ VA)
+            //  ANALIZADOR SINTÁCTICO (AQUÍ VA)
             // ==========================================
             Parser parser = new Parser(tokens);
 
             try {
                 Nodo arbol = parser.parse();
-                System.out.println("✅ Análisis sintáctico correcto");
+                System.out.println("Análisis sintáctico correcto");
 
                 imprimirArbol(arbol, 0);
 
