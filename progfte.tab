@@ -1,4 +1,4 @@
-No.   | VARIABLE             | TIPO         | VALOR INIT | REF    | LINEA
+No.   | VARIABLE             | TIPO         | VALOR INIT | REF    | LINEA
 ---------------------------------------------------------------------------
-1     | x                    | int          | 0          | 300    | 2
-2     | y                    | int          | 0          | 300    | 2
+1     | x                    | int          | 0          | 300    | 2
+2     | y                    | int          | 0          | 300    | 2
