@@ -1,33 +1,24 @@
 import java.util.*;
+import java.util.regex.*;
 
 public class Lexer {
 
-    private List<String> errores = new ArrayList<>();
+    private List<ErrorLexico> errores = new ArrayList<>();
 
-    private static final Set<String> tipos = Set.of(
-            "int", "cad", "booleano"
-    );
+    private static final Set<String> tipos = Set.of("int", "cad", "booleano");
 
+    // Analiza una lista de líneas ya preprocesadas (sin comentarios de bloque ni //)
     public List<Token> analizar(List<String> lineas) {
-
         List<Token> tokens = new ArrayList<>();
         int numLinea = 1;
-        boolean enComentario = false;
 
-        for (String linea : lineas) {
+        for (String lineaOriginal : lineas) {
+            String linea = lineaOriginal;
 
-            if (linea.contains("/*")) {
-                enComentario = true;
-            }
+            // Procesar operadores multi-caracter primero
+            linea = linea.replace(":=", " := ");
 
-            if (enComentario) {
-                if (linea.contains("*/")) {
-                    enComentario = false;
-                }
-                numLinea++;
-                continue;
-            }
-
+            // Insertar espacios alrededor de separadores y operadores simples
             linea = linea
                     .replace(";", " ; ")
                     .replace(",", " , ")
@@ -36,37 +27,41 @@ public class Lexer {
                     .replace("+", " + ")
                     .replace("-", " - ")
                     .replace("*", " * ")
-                    .replace("/", " / ")
-                    .replace(":=", " := ");
+                    .replace("/", " / ");
 
-            String[] palabras = linea.split("\\s+");
+            linea = linea.trim().replaceAll("\\s+", " ");
 
+            if (linea.isEmpty()) {
+                numLinea++;
+                continue;
+            }
+
+            String[] palabras = linea.split(" ");
+
+            int colApprox = 1;
             for (String palabra : palabras) {
-
-                if (palabra.isEmpty()) continue;
+                if (palabra.isEmpty()) { colApprox += 1; continue; }
 
                 Token token = reconocerToken(palabra, numLinea);
 
                 if (token.getTipo() == TokenType.ERROR) {
-                    errores.add(
-                        "Renglón: " + numLinea +
-                        ", Símbolo no identificado '" + palabra + "' (posible error léxico)"
-                    );
-                    continue; // NO detener el análisis
+                    errores.add(new ErrorLexico("Símbolo no identificado '" + palabra + "'", numLinea, colApprox));
+                    // continuar sin detener el análisis
+                } else {
+                    tokens.add(token);
                 }
 
-                tokens.add(token);
+                colApprox += palabra.length() + 1;
             }
 
             numLinea++;
         }
 
-        tokens.add(new Token(TokenType.EOF, "EOF", numLinea));
+        tokens.add(new Token(TokenType.EOF, "EOF", Math.max(1, numLinea - 1)));
         return tokens;
     }
 
     private Token reconocerToken(String lexema, int linea) {
-
         switch (lexema) {
             case "pf2025": return new Token(TokenType.PROG, lexema, linea);
             case "decl": return new Token(TokenType.DECL, lexema, linea);
@@ -83,8 +78,8 @@ public class Lexer {
             case ":=": return new Token(TokenType.ASIG, lexema, linea);
             case ";": return new Token(TokenType.PC, lexema, linea);
             case ",": return new Token(TokenType.COMA, lexema, linea);
-            case "(": return new Token(TokenType.PAREN, lexema, linea);
-            case ")": return new Token(TokenType.TESIS, lexema, linea);
+            case "(": return new Token(TokenType.PAREN_OPEN, lexema, linea);
+            case ")": return new Token(TokenType.PAREN_CLOSE, lexema, linea);
         }
 
         if (tipos.contains(lexema))
@@ -99,7 +94,7 @@ public class Lexer {
         return new Token(TokenType.ERROR, lexema, linea);
     }
 
-    public List<String> getErrores() {
+    public List<ErrorLexico> getErrores() {
         return errores;
     }
 }

@@ -6,61 +6,62 @@ public class Main {
     public static void main(String[] args) {
 
         try {
-
-            // 1. Leer programa fuente
+            // 1. Leer programa fuente (UTF-8 safe)
             List<String> programa = FileManager.leerArchivo("progfte.txt");
 
-            // 2. Ejecutar analizador léxico
-            Lexer lexer = new Lexer();
-            List<Token> tokens = lexer.analizar(programa);
+            // 2. Preprocesado: concatenar y eliminar comentarios de bloque y de línea
+            StringBuilder sbAll = new StringBuilder();
+            for (String l : programa) sbAll.append(l).append("\n");
+            String todo = sbAll.toString();
 
-            // =====================================================
-            // 3. Generar archivo progfte.dep
-            // =====================================================
-            List<String> depurado = new ArrayList<>();
-            for (String linea : programa) {
-                if (!linea.contains("/*")) {
-                    depurado.add(linea.replaceAll("\\s+", ""));
-                }
+            // Eliminar comentarios de bloque /* ... */
+            todo = todo.replaceAll("(?s)/\\*.*?\\*/", "");
+
+            // Eliminar comentarios de línea // hasta fin de línea
+            todo = todo.replaceAll("//.*(?=\\n)", "");
+
+            // Dividir en líneas limpias
+            String[] lineasLimpiasArr = todo.split("\\r?\\n");
+            List<String> lineasLimpias = new ArrayList<>();
+            for (String l : lineasLimpiasArr) {
+                String t = l.replace("\t", " ").trim();
+                if (!t.isEmpty()) lineasLimpias.add(t);
             }
-            FileManager.escribirArchivoDep("progfte.dep", depurado);
 
-            // =====================================================
-            // 4. Tabla de símbolos
-            // =====================================================
+            // 3. Ejecutar analizador léxico sobre líneas limpias
+            Lexer lexer = new Lexer();
+            List<Token> tokens = lexer.analizar(lineasLimpias);
+
+            // 4. Generar archivo progfte.dep (una línea, con espacios entre líneas originales)
+            StringBuilder depSb = new StringBuilder();
+            for (int i = 0; i < lineasLimpias.size(); i++) {
+                if (i > 0) depSb.append(' ');
+                depSb.append(lineasLimpias.get(i));
+            }
+            FileManager.escribirArchivoDep("progfte.dep", Arrays.asList(depSb.toString()));
+
+            // 5. Tabla de símbolos
             List<EntradaSimbolo> tablaSimbolos = construirTablaSimbolos(tokens);
 
-            // =====================================================
-            // 5. Generar progfte.tab
-            // =====================================================
+            // 6. Generar progfte.tab
             String contenidoTab = generarArchivoTab(tablaSimbolos);
-            FileManager.escribirArchivo(
-                "progfte.tab",
-                Arrays.asList(contenidoTab.split("\n"))
-            );
+            FileManager.escribirArchivo("progfte.tab", Arrays.asList(contenidoTab.split("\n")));
 
-            // =====================================================
-            // 6. Generar progfte.tok
-            // =====================================================
+            // 7. Generar progfte.tok (tokens + errores léxicos)
             String contenidoTok = generarArchivoTok(tokens, lexer.getErrores());
-            FileManager.escribirArchivo(
-                "progfte.tok",
-                Arrays.asList(contenidoTok.split("\n"))
-            );
+            FileManager.escribirArchivo("progfte.tok", Arrays.asList(contenidoTok.split("\n")));
 
             System.out.println("Análisis léxico completado");
 
-            // ==========================================
-            //  ANALIZADOR SINTÁCTICO (AQUÍ VA)
-            // ==========================================
-            Parser parser = new Parser(tokens);
+            // 8. Prechecks sobre tokens antes del parser
+            prechecksTokens(tokens);
 
+            // 9. Analizador sintáctico
+            Parser parser = new Parser(tokens);
             try {
                 Nodo arbol = parser.parse();
                 System.out.println("Análisis sintáctico correcto");
-
                 imprimirArbol(arbol, 0);
-
             } catch (Exception e) {
                 System.out.println(e.getMessage());
             }
@@ -70,11 +71,8 @@ public class Main {
         }
     }
 
-    // =========================================================
-    // TABLA DE SÍMBOLOS
-    // =========================================================
+    // Construcción de tabla de símbolos (igual que antes)
     private static List<EntradaSimbolo> construirTablaSimbolos(List<Token> tokens) {
-
         List<EntradaSimbolo> tabla = new ArrayList<>();
         boolean dentroDecl = false;
         String tipoActual = "";
@@ -116,52 +114,28 @@ public class Main {
         return tabla;
     }
 
-    // =========================================================
     private static String generarArchivoTab(List<EntradaSimbolo> tabla) {
-
         StringBuilder sb = new StringBuilder();
-
-        sb.append(String.format(
-            "%-5s | %-20s | %-12s | %-10s | %-6s | %s%n",
-            "No.", "VARIABLE", "TIPO", "VALOR INIT", "REF", "LINEA"
-        ));
+        sb.append(String.format("%-5s | %-20s | %-12s | %-10s | %-6s | %s%n",
+            "No.", "VARIABLE", "TIPO", "VALOR INIT", "REF", "LINEA"));
         sb.append("-".repeat(75)).append("\n");
-
         for (EntradaSimbolo e : tabla) {
-            sb.append(String.format(
-                "%-5d | %-20s | %-12s | %-10s | %-6d | %d%n",
-                e.getNumero(),
-                e.getNombre(),
-                e.getTipo(),
-                e.getValorInicial(),
-                e.getReferencia(),
-                e.getLinea()
-            ));
+            sb.append(String.format("%-5d | %-20s | %-12s | %-10s | %-6d | %d%n",
+                e.getNumero(), e.getNombre(), e.getTipo(), e.getValorInicial(), e.getReferencia(), e.getLinea()));
         }
-
         return sb.toString();
     }
 
-    // =========================================================
-    private static String generarArchivoTok(List<Token> tokens, List<String> errores) {
-
+    private static String generarArchivoTok(List<Token> tokens, List<ErrorLexico> errores) {
         StringBuilder sb = new StringBuilder();
-
-        for (Token t : tokens) {
-            sb.append(t.toString()).append("\n");
-        }
-
+        for (Token t : tokens) sb.append(t.toString()).append("\n");
         if (!errores.isEmpty()) {
-            sb.append("\nERRORES:\n");
-            for (String error : errores) {
-                sb.append(error).append("\n");
-            }
+            sb.append("\nERRORES LEXICOS:\n");
+            for (ErrorLexico err : errores) sb.append(err.toString()).append("\n");
         }
-
         return sb.toString();
     }
 
-    // =========================================================
     private static String valorInicialPorTipo(String tipo) {
         switch (tipo) {
             case "int": return "0";
@@ -171,16 +145,43 @@ public class Main {
         }
     }
 
-    // =========================================================
     public static void imprimirArbol(Nodo nodo, int nivel) {
-        for (int i = 0; i < nivel; i++) {
-            System.out.print("  ");
-        }
-
+        for (int i = 0; i < nivel; i++) System.out.print("  ");
         System.out.println(nodo.getValor());
+        for (Nodo hijo : nodo.getHijos()) imprimirArbol(hijo, nivel + 1);
+    }
 
-        for (Nodo hijo : nodo.getHijos()) {
-            imprimirArbol(hijo, nivel + 1);
+    // ---------- Prechecks ----------
+    private static void prechecksTokens(List<Token> tokens) {
+        checkBalancedParens(tokens);
+        checkConsecutiveOperators(tokens);
+    }
+
+    private static void checkBalancedParens(List<Token> tokens) {
+        int balance = 0;
+        for (Token t : tokens) {
+            if (t.getTipo() == TokenType.PAREN_OPEN) balance++;
+            if (t.getTipo() == TokenType.PAREN_CLOSE) balance--;
+            if (balance < 0) {
+                throw new RuntimeException("Paréntesis desbalanceados: ')' sin '(' en línea " + t.getLinea());
+            }
+        }
+        if (balance != 0) {
+            throw new RuntimeException("Paréntesis desbalanceados: faltan paréntesis de cierre");
+        }
+    }
+
+    private static void checkConsecutiveOperators(List<Token> tokens) {
+        Set<TokenType> operadores = Set.of(TokenType.MAS, TokenType.MENOS, TokenType.MUL, TokenType.DIV, TokenType.ASIG);
+        Token prev = null;
+        for (Token t : tokens) {
+            if (prev != null) {
+                if (operadores.contains(prev.getTipo()) && operadores.contains(t.getTipo())) {
+                    throw new RuntimeException("Operadores consecutivos detectados en línea " + t.getLinea()
+                        + " cerca de '" + prev.getLexema() + " " + t.getLexema() + "'");
+                }
+            }
+            prev = t;
         }
     }
 }

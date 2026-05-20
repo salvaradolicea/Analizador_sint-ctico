@@ -1,1 +1,1 @@
-pf2025declintx,y;iniciox:=5+3;impdig(x);end
+pf2025 decl int x, y; inicio x := x  (x + y); impdig(x); end
