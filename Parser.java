@@ -29,8 +29,8 @@ public class Parser {
 
     private void error(String mensaje) {
         throw new RuntimeException(
-            "Error sintáctico en línea " + actual().getLinea() +
-            ": " + mensaje + " -> " + actual().getLexema()
+            "Error sintáctico en línea " + actual().getLinea()
+            + ": " + mensaje + " -> '" + actual().getLexema() + "'"
         );
     }
 
@@ -147,6 +147,12 @@ public class Parser {
 
         nodo.agregarHijo(expresion());
 
+        //  VALIDACIÓN CLAVE (corrige tu problema principal)
+        if (actual().getTipo() == TokenType.ID ||
+            actual().getTipo() == TokenType.CENT) {
+            error("Expresión mal formada: operandos consecutivos o falta operador");
+        }
+
         consumir(TokenType.PC, "Falta ';'");
 
         return nodo;
@@ -235,6 +241,7 @@ public class Parser {
     private Nodo factor() {
         Token t = actual();
 
+        //  OPERANDOS válidos
         if (t.getTipo() == TokenType.CENT ||
             t.getTipo() == TokenType.ID) {
 
@@ -242,6 +249,7 @@ public class Parser {
             return new Nodo(t.getLexema());
         }
 
+        //  PARÉNTESIS
         if (t.getTipo() == TokenType.PAREN) {
             consumir(TokenType.PAREN, "");
 
@@ -252,7 +260,8 @@ public class Parser {
             return nodo;
         }
 
-        error("Expresión inválida");
+        //  ERROR MEJORADO
+        error("Falta operando o expresión inválida");
         return null;
     }
 }
