@@ -1,6 +1,6 @@
 pf2025
 decl int x, y;
 inicio
-x := x * (x + y);
+x :=  5 + 3;
 impdig(x);
 end

@@ -7,13 +7,9 @@
 <PC, ;, ln:2>
 <INICIO, inicio, ln:3>
 <ID, x, ln:4>
-<ASIG, :=, ln:4>
-<ID, x, ln:4>
-<PAREN_OPEN, (, ln:4>
-<ID, x, ln:4>
+<CENT, 5, ln:4>
 <MAS, +, ln:4>
-<ID, y, ln:4>
-<PAREN_CLOSE, ), ln:4>
+<CENT, 3, ln:4>
 <PC, ;, ln:4>
 <IMPDIG, impdig, ln:5>
 <PAREN_OPEN, (, ln:5>

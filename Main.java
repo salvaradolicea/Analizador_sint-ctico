@@ -40,8 +40,10 @@ public class Main {
             }
             FileManager.escribirArchivoDep("progfte.dep", Arrays.asList(depSb.toString()));
 
-            // 5. Tabla de símbolos
+            // 5. Construir tabla de símbolos a partir de tokens (fase DECL)
             List<EntradaSimbolo> tablaSimbolos = construirTablaSimbolos(tokens);
+            SymbolTable symTable = new SymbolTable();
+            for (EntradaSimbolo e : tablaSimbolos) symTable.agregar(e.getNombre());
 
             // 6. Generar progfte.tab
             String contenidoTab = generarArchivoTab(tablaSimbolos);
@@ -56,8 +58,8 @@ public class Main {
             // 8. Prechecks sobre tokens antes del parser
             prechecksTokens(tokens);
 
-            // 9. Analizador sintáctico
-            Parser parser = new Parser(tokens);
+            // 9. Analizador sintáctico con validación semántica
+            Parser parser = new Parser(tokens, symTable);
             try {
                 Nodo arbol = parser.parse();
                 System.out.println("Análisis sintáctico correcto");
@@ -71,8 +73,11 @@ public class Main {
         }
     }
 
-    // Construcción de tabla de símbolos (igual que antes)
+    // =========================================================
+    // TABLA DE SÍMBOLOS
+    // =========================================================
     private static List<EntradaSimbolo> construirTablaSimbolos(List<Token> tokens) {
+
         List<EntradaSimbolo> tabla = new ArrayList<>();
         boolean dentroDecl = false;
         String tipoActual = "";
@@ -114,28 +119,52 @@ public class Main {
         return tabla;
     }
 
+    // =========================================================
     private static String generarArchivoTab(List<EntradaSimbolo> tabla) {
+
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("%-5s | %-20s | %-12s | %-10s | %-6s | %s%n",
-            "No.", "VARIABLE", "TIPO", "VALOR INIT", "REF", "LINEA"));
+
+        sb.append(String.format(
+            "%-5s | %-20s | %-12s | %-10s | %-6s | %s%n",
+            "No.", "VARIABLE", "TIPO", "VALOR INIT", "REF", "LINEA"
+        ));
         sb.append("-".repeat(75)).append("\n");
+
         for (EntradaSimbolo e : tabla) {
-            sb.append(String.format("%-5d | %-20s | %-12s | %-10s | %-6d | %d%n",
-                e.getNumero(), e.getNombre(), e.getTipo(), e.getValorInicial(), e.getReferencia(), e.getLinea()));
+            sb.append(String.format(
+                "%-5d | %-20s | %-12s | %-10s | %-6d | %d%n",
+                e.getNumero(),
+                e.getNombre(),
+                e.getTipo(),
+                e.getValorInicial(),
+                e.getReferencia(),
+                e.getLinea()
+            ));
         }
+
         return sb.toString();
     }
 
+    // =========================================================
     private static String generarArchivoTok(List<Token> tokens, List<ErrorLexico> errores) {
+
         StringBuilder sb = new StringBuilder();
-        for (Token t : tokens) sb.append(t.toString()).append("\n");
+
+        for (Token t : tokens) {
+            sb.append(t.toString()).append("\n");
+        }
+
         if (!errores.isEmpty()) {
             sb.append("\nERRORES LEXICOS:\n");
-            for (ErrorLexico err : errores) sb.append(err.toString()).append("\n");
+            for (ErrorLexico err : errores) {
+                sb.append(err.toString()).append("\n");
+            }
         }
+
         return sb.toString();
     }
 
+    // =========================================================
     private static String valorInicialPorTipo(String tipo) {
         switch (tipo) {
             case "int": return "0";
@@ -145,16 +174,24 @@ public class Main {
         }
     }
 
+    // =========================================================
     public static void imprimirArbol(Nodo nodo, int nivel) {
-        for (int i = 0; i < nivel; i++) System.out.print("  ");
+        for (int i = 0; i < nivel; i++) {
+            System.out.print("  ");
+        }
+
         System.out.println(nodo.getValor());
-        for (Nodo hijo : nodo.getHijos()) imprimirArbol(hijo, nivel + 1);
+
+        for (Nodo hijo : nodo.getHijos()) {
+            imprimirArbol(hijo, nivel + 1);
+        }
     }
 
     // ---------- Prechecks ----------
     private static void prechecksTokens(List<Token> tokens) {
         checkBalancedParens(tokens);
         checkConsecutiveOperators(tokens);
+        checkOperatorAtLineStartOrEnd(tokens);
     }
 
     private static void checkBalancedParens(List<Token> tokens) {
@@ -178,10 +215,32 @@ public class Main {
             if (prev != null) {
                 if (operadores.contains(prev.getTipo()) && operadores.contains(t.getTipo())) {
                     throw new RuntimeException("Operadores consecutivos detectados en línea " + t.getLinea()
+                        + ": '" + prev.getLexema() + "' seguido de '" + t.getLexema() + "'");
+                }
+                if ((prev.getTipo() == TokenType.CENT || prev.getTipo() == TokenType.ID || prev.getTipo() == TokenType.PAREN_CLOSE)
+                    && (t.getTipo() == TokenType.CENT || t.getTipo() == TokenType.ID || t.getTipo() == TokenType.PAREN_OPEN)) {
+                    throw new RuntimeException("Falta operador entre operandos en línea " + t.getLinea()
                         + " cerca de '" + prev.getLexema() + " " + t.getLexema() + "'");
                 }
             }
             prev = t;
+        }
+    }
+
+    private static void checkOperatorAtLineStartOrEnd(List<Token> tokens) {
+        for (int i = 0; i < tokens.size(); i++) {
+            Token t = tokens.get(i);
+            if ((t.getTipo() == TokenType.MAS || t.getTipo() == TokenType.MENOS ||
+                 t.getTipo() == TokenType.MUL || t.getTipo() == TokenType.DIV || t.getTipo() == TokenType.ASIG)) {
+                Token prev = (i > 0) ? tokens.get(i - 1) : null;
+                Token next = (i < tokens.size() - 1) ? tokens.get(i + 1) : null;
+                if (prev == null || prev.getTipo() == TokenType.PC || prev.getTipo() == TokenType.DECL || prev.getTipo() == TokenType.INICIO) {
+                    throw new RuntimeException("Operador '" + t.getLexema() + "' en posición inválida en línea " + t.getLinea());
+                }
+                if (next == null || next.getTipo() == TokenType.PC || next.getTipo() == TokenType.END) {
+                    throw new RuntimeException("Operador '" + t.getLexema() + "' sin operando a la derecha en línea " + t.getLinea());
+                }
+            }
         }
     }
 }

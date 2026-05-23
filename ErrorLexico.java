@@ -1,8 +1,7 @@
 public class ErrorLexico {
-
     private String mensaje;
     private int linea;
-    private int columna; // aproximada, opcional
+    private int columna;
 
     public ErrorLexico(String mensaje, int linea) {
         this(mensaje, linea, -1);

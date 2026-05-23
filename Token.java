@@ -1,5 +1,4 @@
 public class Token {
-
     private TokenType tipo;
     private String lexema;
     private int linea;

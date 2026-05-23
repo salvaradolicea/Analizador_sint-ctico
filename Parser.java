@@ -4,9 +4,11 @@ public class Parser {
 
     private List<Token> tokens;
     private int index = 0;
+    private SymbolTable symbolTable;
 
-    public Parser(List<Token> tokens) {
+    public Parser(List<Token> tokens, SymbolTable symbolTable) {
         this.tokens = tokens;
+        this.symbolTable = symbolTable;
     }
 
     private Token actual() {
@@ -25,20 +27,14 @@ public class Parser {
         }
     }
 
-    // Generador uniforme de RuntimeException con token problemático
     private RuntimeException syntaxErrorFor(Token t, String mensaje) {
         return new RuntimeException(
             "Error sintáctico en línea " + t.getLinea() + ": " + mensaje + " -> '" + t.getLexema() + "'"
         );
     }
 
-    // Mensajes especializados para expresiones
     private String msgMissingOperatorBefore(Token t) {
         return "Expresión mal formada: falta operador entre operandos antes de";
-    }
-
-    private String msgMissingOperatorAfter(Token t) {
-        return "Expresión mal formada: falta operador después de";
     }
 
     private String msgMissingOperandFor(Token t) {
@@ -49,9 +45,6 @@ public class Parser {
         return "Token inesperado en la expresión";
     }
 
-    // =========================
-    // PROGRAMA PRINCIPAL
-    // =========================
     public Nodo parse() {
         Nodo raiz = new Nodo("PROGRAMA");
 
@@ -65,9 +58,6 @@ public class Parser {
         return raiz;
     }
 
-    // =========================
-    // DECLARACIONES
-    // =========================
     private Nodo declaraciones() {
         Nodo nodo = new Nodo("DECL");
 
@@ -113,9 +103,6 @@ public class Parser {
         return nodo;
     }
 
-    // =========================
-    // BLOQUE
-    // =========================
     private Nodo bloque() {
         Nodo nodo = new Nodo("BLOQUE");
 
@@ -130,9 +117,6 @@ public class Parser {
         return nodo;
     }
 
-    // =========================
-    // SENTENCIAS
-    // =========================
     private Nodo sentencia() {
         Token t = actual();
 
@@ -149,6 +133,12 @@ public class Parser {
 
         Token id = actual();
         consumir(TokenType.ID, "Se esperaba ID");
+
+        if (!symbolTable.existe(id.getLexema())) {
+            throw new RuntimeException("Error semántico en línea " + id.getLinea() +
+                ": variable '" + id.getLexema() + "' no declarada");
+        }
+
         nodo.agregarHijo(new Nodo(id.getLexema()));
 
         consumir(TokenType.ASIG, "Falta ':='");
@@ -158,17 +148,13 @@ public class Parser {
 
         Token siguiente = actual();
 
-        // Si el siguiente token no es ';' ni EOF, es muy probable que la expresión esté mal formada.
         if (siguiente.getTipo() != TokenType.PC && siguiente.getTipo() != TokenType.EOF) {
-            // Si el token siguiente es un número o ID, falta operador entre operandos
             if (siguiente.getTipo() == TokenType.CENT || siguiente.getTipo() == TokenType.ID) {
                 throw syntaxErrorFor(siguiente, msgMissingOperatorBefore(siguiente));
             }
-            // Si el token siguiente es '(', falta operador entre operandos (ej: x ( ... ) )
             if (siguiente.getTipo() == TokenType.PAREN_OPEN) {
                 throw syntaxErrorFor(siguiente, msgMissingOperatorBefore(siguiente));
             }
-            // Otros casos: token inesperado
             throw syntaxErrorFor(siguiente, msgUnexpectedToken(siguiente));
         }
 
@@ -208,6 +194,12 @@ public class Parser {
 
         Token id = actual();
         consumir(TokenType.ID, "Se esperaba ID");
+
+        if (!symbolTable.existe(id.getLexema())) {
+            throw new RuntimeException("Error semántico en línea " + id.getLinea() +
+                ": variable '" + id.getLexema() + "' no declarada");
+        }
+
         nodo.agregarHijo(new Nodo(id.getLexema()));
 
         consumir(TokenType.PAREN_CLOSE, "Falta ')'");
@@ -216,9 +208,6 @@ public class Parser {
         return nodo;
     }
 
-    // =========================
-    // EXPRESIONES
-    // =========================
     private Nodo expresion() {
         Nodo nodo = termino();
 
@@ -228,7 +217,6 @@ public class Parser {
             Token op = actual();
             avanzar();
 
-            // Si después del operador no viene un operando válido, error claro
             Token siguiente = actual();
             if (!(siguiente.getTipo() == TokenType.CENT || siguiente.getTipo() == TokenType.ID || siguiente.getTipo() == TokenType.PAREN_OPEN)) {
                 throw syntaxErrorFor(siguiente, msgMissingOperandFor(op));
@@ -275,7 +263,16 @@ public class Parser {
     private Nodo factor() {
         Token t = actual();
 
-        if (t.getTipo() == TokenType.CENT || t.getTipo() == TokenType.ID) {
+        if (t.getTipo() == TokenType.CENT) {
+            avanzar();
+            return new Nodo(t.getLexema());
+        }
+
+        if (t.getTipo() == TokenType.ID) {
+            if (!symbolTable.existe(t.getLexema())) {
+                throw new RuntimeException("Error semántico en línea " + t.getLinea() +
+                    ": variable '" + t.getLexema() + "' no declarada");
+            }
             avanzar();
             return new Nodo(t.getLexema());
         }
@@ -286,7 +283,6 @@ public class Parser {
 
             Token siguiente = actual();
             if (siguiente.getTipo() != TokenType.PAREN_CLOSE) {
-                // Si no hay ')' después de la subexpresión, indicar que falta cierre o que hay token inesperado
                 if (siguiente.getTipo() == TokenType.CENT || siguiente.getTipo() == TokenType.ID || siguiente.getTipo() == TokenType.PAREN_OPEN) {
                     throw syntaxErrorFor(siguiente, msgMissingOperatorBefore(siguiente));
                 }
@@ -297,7 +293,6 @@ public class Parser {
             return nodo;
         }
 
-        // Token inesperado en lugar de operando
         throw syntaxErrorFor(t, "Falta operando o expresión inválida");
     }
 }
